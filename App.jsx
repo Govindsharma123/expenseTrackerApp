@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import SplashScreen from './src/screens/SplashScreen';
 import WebViewScreen from './src/screens/WebViewScreen';
-
-type Screen = 'splash' | 'webview';
+import {requestMicrophonePermission} from './services/microphonePermission';
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('splash');
+  const [screen, setScreen] = useState('splash');
+
+  const handleSplashFinish = async () => {
+    await requestMicrophonePermission();
+    setScreen('webview');
+  };
 
   return (
     <SafeAreaProvider>
       {screen === 'splash' ? (
-        <SplashScreen onFinish={() => setScreen('webview')} />
+        <SplashScreen onFinish={handleSplashFinish} />
       ) : (
         <WebViewScreen />
       )}

@@ -7,11 +7,7 @@ import {
   View,
 } from 'react-native';
 
-type Props = {
-  onFinish: () => void;
-};
-
-export default function SplashScreen({ onFinish }: Props) {
+export default function SplashScreen({ onFinish }) {
   useEffect(() => {
     const timer = setTimeout(onFinish, 2500);
     return () => clearTimeout(timer);
