@@ -1,5 +1,12 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {AppState, Linking, StatusBar, StyleSheet, View} from 'react-native';
+import {
+  AppState,
+  Linking,
+  StatusBar,
+  StyleSheet,
+  View,
+  Text,
+} from 'react-native';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import {WebView} from 'react-native-webview';
 
@@ -9,62 +16,19 @@ const LOGIN_URL = `${APP_URL}login?redirect=${encodeURIComponent(
   AUTH_REDIRECT_URL,
 )}`;
 
-const IFRAME_DIAGNOSTIC_SCRIPT = `
-  (function () {
-    if (window.__RN_IFRAME_DIAGNOSTIC_INSTALLED__) {
-      return true;
-    }
-
-    window.__RN_IFRAME_DIAGNOSTIC_INSTALLED__ = true;
-
-    function collectIframes() {
-      var frames = Array.from(document.querySelectorAll('iframe')).map(function (frame, index) {
-        return {
-          index: index,
-          id: frame.id || null,
-          title: frame.title || null,
-          src: frame.getAttribute('src') || null,
-          allow: frame.getAttribute('allow') || null,
-        };
-      });
-
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'iframe-diagnostic',
-        count: frames.length,
-        frames: frames,
-      }));
-    }
-
-    collectIframes();
-
-    var observer = new MutationObserver(function () {
-      collectIframes();
-    });
-
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['src', 'allow', 'title', 'id'],
-    });
-
-    window.addEventListener('load', collectIframes);
-    setTimeout(collectIframes, 1500);
-    setTimeout(collectIframes, 4000);
-
-    return true;
-  })();
-`;
-
 export default function WebViewScreen() {
   const webViewRef = useRef(null);
+
   const [theme, setTheme] = useState('light');
   const [webViewKey, setWebViewKey] = useState(0);
+  const [isConnected, setIsConnected] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const refreshWebSession = () => {
     setWebViewKey(prev => prev + 1);
   };
 
+  // 🔁 Reload on app foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
@@ -75,20 +39,15 @@ export default function WebViewScreen() {
     return () => subscription.remove();
   }, []);
 
+  // 🔗 Deep link handling (same as your code)
   useEffect(() => {
     const handleDeepLink = async event => {
       const returnedUrl = event?.url;
-      if (!returnedUrl?.startsWith(AUTH_REDIRECT_URL)) {
-        return;
-      }
-
-      console.log('Returned:', returnedUrl);
+      if (!returnedUrl?.startsWith(AUTH_REDIRECT_URL)) return;
 
       try {
         await InAppBrowser.closeAuth();
-      } catch (error) {
-        // Ignore close errors if the auth browser is already gone.
-      }
+      } catch {}
 
       refreshWebSession();
     };
@@ -113,8 +72,6 @@ export default function WebViewScreen() {
           {
             showTitle: true,
             enableUrlBarHiding: true,
-            enableDefaultShare: false,
-            ephemeralWebSession: false,
           },
         );
 
@@ -139,6 +96,7 @@ export default function WebViewScreen() {
         barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={theme === 'dark' ? '#000000' : '#FFFFFF'}
       />
+
       <WebView
         key={webViewKey}
         ref={webViewRef}
@@ -146,6 +104,8 @@ export default function WebViewScreen() {
         style={styles.webview}
         javaScriptEnabled
         domStorageEnabled
+        cacheEnabled={true}
+        onLoad={() => setHasLoadedOnce(true)} // ✅ important
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         mediaPlaybackRequiresUserAction={false}
@@ -159,29 +119,17 @@ export default function WebViewScreen() {
             refreshWebSession();
             return false;
           }
-
           return true;
         }}
         onPermissionRequest={event => {
           event.grant(event.resources);
         }}
-        injectedJavaScript={IFRAME_DIAGNOSTIC_SCRIPT}
         onMessage={event => {
           const message = event.nativeEvent.data;
 
           if (message === 'GOOGLE_LOGIN') {
             openGoogleLogin();
             return;
-          }
-          try {
-            const parsedMessage = JSON.parse(message);
-
-            if (parsedMessage.type === 'iframe-diagnostic') {
-              console.log('WebView iframe diagnostic:', parsedMessage);
-              return;
-            }
-          } catch (error) {
-            // Ignore non-JSON messages and continue with the theme flow.
           }
 
           if (message === 'dark' || message === 'light') {
@@ -200,5 +148,27 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
+  },
+  banner: {
+    backgroundColor: '#ff3b30',
+    padding: 8,
+    alignItems: 'center',
+  },
+  bannerText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  text: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  subText: {
+    marginTop: 10,
+    color: 'gray',
   },
 });
